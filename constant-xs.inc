@@ -28,6 +28,13 @@ badPasteboardSyncErr ()
 	RETVAL
 
 long
+coreFoundationUnknownErr ()
+    CODE:
+	RETVAL = pbl_coreFoundationUnknownErr ();
+    OUTPUT:
+	RETVAL
+
+long
 duplicatePasteboardFlavorErr ()
     CODE:
 	RETVAL = pbl_duplicatePasteboardFlavorErr ();

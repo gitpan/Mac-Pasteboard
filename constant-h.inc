@@ -24,6 +24,12 @@ long pbl_badPasteboardItemErr ();
 long pbl_badPasteboardSyncErr ();
 
 /*
+ * pbl_coreFoundationUnknownErr returns the value of coreFoundationUnknownErr.
+ */
+
+long pbl_coreFoundationUnknownErr ();
+
+/*
  * pbl_duplicatePasteboardFlavorErr returns the value of duplicatePasteboardFlavorErr.
  */
 
