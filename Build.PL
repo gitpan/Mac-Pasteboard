@@ -1,12 +1,16 @@
 use 5.006;
 
-$^O eq 'darwin'
-    or die "OS unsupported\n";
-
 use strict;
 use warnings;
 
+use lib qw{ inc };
+
+$^O eq 'darwin'
+    or die "OS unsupported\n";
+
 use Module::Build;
+use Mac::Pasteboard::Build;
+use Mac::Pasteboard::Meta;
 use Config;
 
 my @ld;
@@ -38,7 +42,12 @@ if ($ENV{DEVELOPER_DEBUG}) {
     local $_ = $ENV{DEVELOPER_DEBUG};
     m/\bbacktrace\b/i and push @ccflags, '-DDEBUG_PBL_BACKTRACE';
 }
-my $bldr = Module::Build->new (
+
+(my $mbv = Module::Build->VERSION) =~ s/_//g;
+
+my $meta = Mac::Pasteboard::Meta->new();
+
+my %attr = (
     dist_author => 'Tom Wyant (wyant at cpan dot org)',
     dist_abstract => 'Manipulate Mac OS X pasteboards',
     module_name => 'Mac::Pasteboard',
@@ -47,12 +56,14 @@ my $bldr = Module::Build->new (
     get_options => {y => {}, n => {}},
     dynamic_config => 1,
     license => 'perl',
-    requires => {
-	'Scalar::Util' => 1.01,
-    },
-    build_requires => {
-	'ExtUtils::CBuilder' => 0,
-    },
+    requires => $meta->requires(
+	perl	=> $meta->requires_perl(),
+    ),
+    build_requires => $meta->build_requires(
+	$meta->distribution() ? () : (
+	    'ExtUtils::CBuilder' => 0,
+	),
+    ),
     config => {
 	lddlflags => $Config{lddlflags} . ' -framework ApplicationServices',
     },
@@ -65,6 +76,20 @@ my $bldr = Module::Build->new (
 	()
     ),
 );
+
+$mbv >= 0.28 and $attr{meta_merge} = {
+    no_index => {
+	directory => [qw{ inc t xt }],
+    },
+    resources => {
+	bugtracker => 'https://rt.cpan.org/Public/Dist/Display.html?Name=Mac-Pasteboard',
+    },
+};
+
+$mbv >= 0.34
+    and $attr{auto_configure_requires} = 0;	# Don't require Module::Build
+
+my $bldr = Mac::Pasteboard::Build->new (%attr);
 
 my %opt = $bldr->args ();
 my @exe_files;
@@ -93,11 +118,11 @@ eod
 }
 
 if ($^O eq 'MSWin32') {
-    @exe_files = map "bin/$_", @exe_files;
+    @exe_files = map {"bin/$_"} @exe_files;
     foreach (@exe_files) {`pl2bat $_`}
-    @clean_files = @exe_files = grep -e $_, map "$_.bat", @exe_files;
+    @clean_files = @exe_files = grep {-e $_} map {"$_.bat"} @exe_files;
 } elsif ($^O eq 'VMS') {
-    foreach my $fni (map "[.bin]$_", @exe_files) {
+    foreach my $fni (map {"[.bin]$_"} @exe_files) {
 	my $fno = "$fni.com";
 	local $/ = undef;
 	open (my $fhi, '<', $fni)
@@ -106,10 +131,12 @@ if ($^O eq 'MSWin32') {
 	    or die "Error - Unable to open $fno: $!\n";
 	print $fho "$Config{startperl}\n";
 	print $fho scalar <$fhi>;
+	close $fhi;
+	close $fho;
     }
-    @clean_files = @exe_files = map "[.bin]$_.com", @exe_files;
+    @clean_files = @exe_files = map {"[.bin]$_.com"} @exe_files;
 } else {
-    @exe_files = map "bin/$_", @exe_files;
+    @exe_files = map {"bin/$_"} @exe_files;
 }
 
 $bldr->add_to_cleanup (@clean_files);

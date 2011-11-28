@@ -37,13 +37,16 @@ our @ISA = qw(Exporter);
 	const => \@const,
     );
 
-    our @EXPORT = @funcs;
+    # We have a functional interface, and at this point no longer
+    # exporting it by default would be a change in the public
+    # interface. So we disable Perl::Critic.
+    our @EXPORT = @funcs;	## no critic (ProhibitAutomaticExportation)
 }
 
-our $VERSION = '0.002';
+our $VERSION = '0.002_90';
 our $XS_VERSION = $VERSION;
 our $ALPHA_VERSION = $VERSION;
-$VERSION = eval $VERSION;  # see L<perlmodstyle>
+$VERSION =~ s/_//g;
 
 require XSLoader;
 XSLoader::load('Mac::Pasteboard', $XS_VERSION);
@@ -56,7 +59,11 @@ BEGIN {
     } or do {
 	*dualvar = sub {$_[0]};
     };
-    eval {require Mac::Errors};
+
+    eval {	## no critic (RequireCheckingReturnValueOfEval)
+	require Mac::Errors;	# Optional
+	1;
+    };
 }
 
 my %attr = (
@@ -86,9 +93,9 @@ my %static = (
 );
 
 sub new {
-    my $class = ref $_[0] || $_[0];
-    shift;
-    my $name = @_ ? shift : kPasteboardClipboard ();
+    my ($class, $name) = @_;
+    ref $class and $class = ref $class;
+    defined $name or $name = kPasteboardClipboard();
     $ENV{DEVELOPER_DEBUG}
 	and warn __PACKAGE__, "->new() creating $name";
     my $self = bless {
@@ -96,18 +103,18 @@ sub new {
 	id => undef,
 	missing_ok => 0,
 	name => $name,
-    };
+    }, $class;
     my ($status, $pbref, $created_name) = xs_pbl_create ($self->{name});
-    __PACKAGE__->_check ($status) and return undef;
+    __PACKAGE__->_check ($status) and return;
     $created_name and $self->{name} = $created_name;
     $self->{pbref} = $pbref;
     $self->{status} = $static{status};
-    $self;
+    return $self;
 }
 
 sub clear {
     my ($self) = @_;
-    $self->_check (xs_pbl_clear ($self->{pbref}));
+    return $self->_check (xs_pbl_clear ($self->{pbref}));
 }
 
 sub clone {
@@ -116,15 +123,15 @@ sub clone {
     if (defined (my $pbref = $self->{pbref})) {
 	xs_pbl_retain ($pbref);
     }
-    bless $clone, ref $self;
+    return bless $clone, ref $self;
 }
 
 sub copy {
     my ($self, $data, $flavor, $flags) = @_;
-    defined $flavor && $flavor ne ''
+    (defined $flavor && $flavor ne '')
 	or $flavor = defaultFlavor ();
     defined $flags or $flags = kPasteboardFlavorNoFlags ();
-    $self->_check (
+    return $self->_check (
 	xs_pbl_copy (
 	    $self->{pbref}, $data,
 	    (defined $self->{id} ? $self->{id} : 1), $flavor, $flags)
@@ -136,7 +143,7 @@ sub flavors {
     my ($status, @data) = xs_pbl_all (
 	$self->{pbref}, $self->{id}, 0, $conforms_to);
     $self->_check ($status) and return;
-    wantarray ? @data : \@data;
+    return wantarray ? @data : \@data;
 }
 
 {
@@ -158,31 +165,31 @@ sub flavors {
 	    push @rslt, $name;
 	}
 	@rslt or push @rslt, 'kPasteboardFlavorNoFlags';
-	wantarray ? @rslt : join ', ', @rslt;
+	return wantarray ? @rslt : join ', ', @rslt;
     }
 }
 
 sub flavor_tags {
     my $flavor = pop;
     my $hash = xs_pbl_uti_tags ($flavor);
-    wantarray ? %$hash : $hash;
+    return wantarray ? %$hash : $hash;
 }
 
 sub get {
     my ($self, $name) = @_;
     exists $attr{$name}
 	or croak "No such attribute as '$name'";
-    ref $self ? $self->{$name} : $static{$name};
+    return ref $self ? $self->{$name} : $static{$name};
 }
 
 sub paste {
     my ($self, $flavor) = @_;
-    defined $flavor && $flavor ne ''
+    (defined $flavor && $flavor ne '')
 	or $flavor = defaultFlavor ();
     my ($status, $data, $flags) = xs_pbl_paste (
 	$self->{pbref}, $self->{id}, $flavor);
     $self->_check ($status);
-    wantarray ? ($data, $flags) : $data;
+    return wantarray ? ($data, $flags) : $data;
 }
 
 sub paste_all {
@@ -190,51 +197,51 @@ sub paste_all {
     my ($status, @data) = xs_pbl_all (
 	$self->{pbref}, $self->{id}, 1, $conforms_to);
     $self->_check ($status) and return;
-    wantarray ? @data : \@data;
+    return wantarray ? @data : \@data;
 }
 
-sub pbcopy (;$$$) {
+sub pbcopy (;$$$) {		## no critic (ProhibitSubroutinePrototypes)
     unshift @_, kPasteboardClipboard ();
     goto &_pbcopy;
 }
 
-sub pbcopy_find (;$$$) {
+sub pbcopy_find (;$$$) {	## no critic (ProhibitSubroutinePrototypes)
     unshift @_, kPasteboardFind ();
     goto &_pbcopy;
 }
 
-sub pbpaste (;$) {
+sub pbpaste (;$) {		## no critic (ProhibitSubroutinePrototypes)
     unshift @_, kPasteboardClipboard ();
     goto &_pbpaste;
 }
 
-sub pbpaste_find (;$) {
+sub pbpaste_find (;$) {		## no critic (ProhibitSubroutinePrototypes)
     unshift @_, kPasteboardFind ();
     goto &_pbpaste;
 }
 
 sub set {
-    my $self = shift;
+    my ($self, @args) = @_;
     my $hash = ref $self ? $self : \%static;
-    while (@_) {
-	my $name = shift;
+    while (@args) {
+	my $name = shift @args;
 	exists $attr{$name}
 	    or croak "No such attribute as '$name'";
 	$attr{$name}
 	    or croak "Attribute '$name' is read-only";
 	my $ref = ref $attr{$name};
 	if ($ref eq 'CODE') {
-	    $hash->{$name} = $attr{$name}->($self, $name, shift);
+	    $hash->{$name} = $attr{$name}->($self, $name, shift @args);
 	} else {
-	    $hash->{$name} = shift;
+	    $hash->{$name} = shift @args;
 	}
     }
-    $self;
+    return $self;
 }
 
 sub synch {
     my ($self) = @_;
-    xs_pbl_synch ($self->{pbref});
+    return xs_pbl_synch ($self->{pbref});
 }
 
 {
@@ -249,7 +256,7 @@ sub synch {
 	    $flag & $flags{$name} or next;
 	    push @rslt, $name;
 	}
-	wantarray ? @rslt : join ', ', @rslt;
+	return wantarray ? @rslt : join ', ', @rslt;
     }
 }
 
@@ -294,18 +301,18 @@ sub synch {
     sub _error {
 	my $val = pop;
 	if (!$val) {
-	    dualvar (0, '');
+	    return dualvar (0, '');
 	} elsif (my $err = $Mac::Errors::MacErrors{$val}) {
-	    dualvar ($val,
+	    return dualvar ($val,
 		sprintf ('Mac OS error %d (%s): %s',
 		    $err->number, $err->symbol, $err->description));
 	} elsif (exists $errtxt{$val}) {
-	    dualvar ($val,
+	    return dualvar ($val,
 		sprintf ('%s error %d (%s): %s',
 		    $errtxt{$val}{type} || 'Pasteboard', $val,
 		    $errtxt{$val}{sym}, $errtxt{$val}{desc}));
 	} else {
-	    dualvar ($val, "Unknown error ($val)");
+	    return dualvar ($val, "Unknown error ($val)");
 	}
     }
 
@@ -314,11 +321,11 @@ sub synch {
 	my $hash = ref $self ? $self : \%static;
 	$hash->{status} = my $dual = _error ($error);
 	if ($error == -25133 && $hash->{missing_ok}) {
-	    $dual;
+	    return $dual;
 	} elsif ($error && $hash->{fatal}) {
 	    croak $dual;
 	} else {
-	    $dual;
+	    return $dual;
 	}
     }
 }
@@ -328,22 +335,22 @@ sub synch {
     my %cache;	# So we don't have to keep instantiating pasteboards.
 
     sub _pbcopy {
-	my $name = shift;
+	my ($name, @args) = @_;
 	my $pb = $cache{$name} ||= __PACKAGE__->new ($name);
-	@_ or push @_, $_;
+	@args or push @args, $_;
 	$pb->clear ();
 	$pb->set (id => undef);	# should be undef anyway, but ...
-	$pb->copy (@_);
+	return $pb->copy (@args);
     }
 
     sub _pbpaste {
-	my $name = shift;
+	my ($name, @args) = @_;
 	my $pb = $cache{$name} ||= __PACKAGE__->new ($name);
 	$pb->set (
 	    id => undef,	# should be undef anyway, but ...
 	    missing_ok => 1,	# no exception for missing data ...
 	);
-	$pb->paste (@_);
+	return $pb->paste (@args);
     }
 
 }
@@ -351,6 +358,7 @@ sub synch {
 sub DESTROY {
     my ($self) = @_;
     $self->{pbref} and xs_pbl_release ($self->{pbref});
+    return;
 }
 
 # Autoload methods go after =cut, and are processed by the autosplit program.
@@ -956,10 +964,16 @@ Thomas R. Wyant, III, F<wyant at cpan dot org>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008 by Thomas R. Wyant, III. All rights reserved.
+Copyright (C) 2008, 2011 by Thomas R. Wyant, III
 
-This library is free software; you can redistribute it and/or modify
-it under the same terms as Perl itself, either Perl version 5.8.0 or,
-at your option, any later version of Perl 5 you may have available.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl 5.10.0. For more details, see the full text
+of the licenses in the directory LICENSES.
+
+This program is distributed in the hope that it will be useful, but
+without any warranty; without even the implied warranty of
+merchantability or fitness for a particular purpose.
 
 =cut
+
+# ex: set textwidth=72 :

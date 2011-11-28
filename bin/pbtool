@@ -87,6 +87,7 @@ use strict;
 use warnings;
 
 use Getopt::Long;
+use IO::File;
 use Mac::Pasteboard qw{:const};
 use Text::ParseWords;
 
@@ -97,9 +98,9 @@ BEGIN {
     die "Neither YAML::Syck, YAML, nor Data::Dumper available.\n";
 }
 
-our $VERSION = '0.001';
+our $VERSION = '0.002_90';
 our $ALPHA_VERSION = $VERSION;
-$VERSION = eval $VERSION;
+$VERSION =~ s/_//g;
 
 my %opt = (
     binary => 1,
@@ -107,7 +108,8 @@ my %opt = (
     id => undef,
 );
 
-open (my $binout, '>&', \*STDOUT)
+# We hold on to this filehandle for the duration.
+open (my $binout, '>&', \*STDOUT)	## no critic (RequireBriefOpen)
     or die "Failed to duplicate STDOUT: $!\n";
 binmode ($binout)
     or die "Failed to put \$binout into binmode: $!\n";
@@ -130,15 +132,15 @@ eod
     } else {
 	*_read_contin = sub {print STDERR $_[0] || '-> '; <STDIN>};
     }
-    warn <<eod;
-Copyright (C) 2008 Thomas R. Wyant, III. All rights reserved.
+    warn <<'EOD';
+Copyright (C) 2008, 2011 Thomas R. Wyant, III.
 See documentation for license.
 
-eod
+EOD
 } else {
     *_read_contin = sub {<STDIN>};
 }
-sub _readline {_read_contin ('pbtool> ')}
+sub _readline {return _read_contin ('pbtool> ')}
 
 while (defined ($_ = _readline ())) {
     chomp;
@@ -151,8 +153,8 @@ while (defined ($_ = _readline ())) {
 	substr ($cmd, 0, 1) ne '_' and my $code = __PACKAGE__->can ($cmd)
 	    or die "No such command as '$cmd'.\n";
 	$code->(@args);
-    };
-    $@ and warn $@;
+	1;
+    } or warn $@;
 }
 -t and print "\n";
 
@@ -170,6 +172,7 @@ clipboard becomes the current pasteboard and is cleared.
 sub clear {
     $pb or create (@_);
     $pb->clear ();
+    return;
 }
 
 =head2 copy data [flavor [flags]]
@@ -189,6 +192,7 @@ with that ID. If it is set to undef, it is copied to item id 1.
 sub copy {
     $pb or create ();
     $pb->copy (@_);
+    return;
 }
 
 =head2 create [name]
@@ -205,6 +209,7 @@ pasteboard. If no name is specified, you get the system clipboard, named
 	my $name = defined $_[0] ? $_[0] : kPasteboardClipboard;
 	$pb = $cache{$name} ||= Mac::Pasteboard->new (
 	    $name, id => $opt{id});
+	return;
     }
 }
 
@@ -215,10 +220,11 @@ Data::Dumper format.
 
 =cut
 
-sub dump {
+sub dump {	## no critic (ProhibitBuiltinHomonyms)
     $pb or create ();
     use Data::Dumper;
     print Dumper ($pb);
+    return;
 }
 
 =head2 exit
@@ -228,8 +234,8 @@ effect.
 
 =cut
 
-sub exit {
-    exit;
+sub exit {	## no critic (ProhibitBuiltinHomonyms)
+    CORE::exit;
 }
 
 =head2 flavors [conforms_to]
@@ -278,6 +284,7 @@ sub flavors {
 	    $_->{tags} = $flavor_tags{$_->{flavor}}
 		||= $pb->flavor_tags ($_->{flavor});
 	    $_} $pb->flavors (@_)]);
+    return;
 }
 
 =head2 help
@@ -288,6 +295,7 @@ This command displays the documentation for pbtool.
 
 sub help {
     _usage (2);
+    return;
 }
 
 =head2 name
@@ -301,6 +309,7 @@ and its name is displayed.
 sub name {
     $pb or create ();
     print $pb->get ('name'), "\n";
+    return;
 }
 
 =head2 opt
@@ -316,17 +325,21 @@ still in effect):
 
 =cut
 
-BEGIN {
-    my $boolean = sub {$opt{$_[0]} ? $_[0] : 'no' . $_[0]};
-    my %fmtr = (
-	binary => $boolean,
-	echo => $boolean,
-	id => sub {defined $_[1] ? "$_[0]=$_[1]" : 'no' . $_[0]},
-    );
+{
+    my ($boolean, %fmtr);
+    BEGIN {
+	$boolean = sub {$opt{$_[0]} ? $_[0] : 'no' . $_[0]};
+	%fmtr = (
+	    binary => $boolean,
+	    echo => $boolean,
+	    id => sub {defined $_[1] ? "$_[0]=$_[1]" : 'no' . $_[0]},
+	);
+    }
     sub opt {
 	@_ and _options (@_);
-	print join (' ', 'opt', map '-' . $fmtr{$_}->($_, $opt{$_}),
+	print join (' ', 'opt', map {'-' . $fmtr{$_}->($_, $opt{$_})}
 	    sort keys %fmtr), "\n";
+	return;
     }
 }
 
@@ -343,12 +356,14 @@ from the item whose ID is the given I<id>.
 =cut
 
 sub paste {
+    my @args = @_;
     $pb or create ();
-    my ($data, $flags) = $pb->paste (@_);
+    my ($data, $flags) = $pb->paste (@args);
     print STDERR "Flags = $flags (",
 	scalar $pb->flavor_flag_names ($flags), ")\n";
     print $data;
     substr ($data, -1, 1) eq "\n" or print "\n";
+    return;
 }
 
 =head2 paste_all [conforms_to]
@@ -374,6 +389,7 @@ sub paste_all {
 	    $_->{tags} = $flavor_tags{$_->{flavor}}
 		||= $pb->flavor_tags ($_->{flavor});
 	    $_} $pb->paste_all (@_)]);
+    return;
 }
 
 =head2 pbpaste
@@ -384,12 +400,14 @@ clipboard.
 =cut
 
 sub pbpaste {
-    my ($data, $flags) = Mac::Pasteboard::pbpaste (@_);
+    my @args = @_;
+    my ($data, $flags) = Mac::Pasteboard::pbpaste (@args);
     defined $data or die "No data found\n";
     print STDERR "Flags = $flags (",
 	scalar Mac::Pasteboard::flavor_flag_names ($flags), ")\n";
     print $data;
     substr ($data, -1, 1) eq "\n" or print "\n";
+    return;
 }
 
 =head2 status [value]
@@ -402,9 +420,11 @@ pasteboard, and its status is displayed.
 =cut
 
 sub status {
+    my @args = @_;
     $pb or create ();
-    @_ and $pb->set (status => $_[0]);
+    @args and $pb->set (status => $args[0]);
     print $pb->get ('status'), "\n";
+    return;
 }
 
 =head2 synch [name]
@@ -420,10 +440,12 @@ standard out.
 =cut
 
 sub synch {
-    !$pb || @_ and create (@_);
+    my @args = @_;
+    (!$pb || @args) and create (@args);
     my $flags = $pb->synch ();
     print STDERR "Flags = $flags (",
         scalar $pb->synch_flag_names ($flags), ")\n";
+    return;
 }
 
 =head2 unique
@@ -434,7 +456,8 @@ and above, this name is available via the 'name' command.
 =cut
 
 sub unique {
-    $pb = Mac::Pasteboard->new (kPasteboardUniqueName, id => $opt{id});
+    return $pb = Mac::Pasteboard->new (
+	kPasteboardUniqueName, id => $opt{id});
 }
 
 ########################################################################
@@ -447,13 +470,16 @@ sub unique {
 #
 
 sub _parse_tokens {
+    my @tokens = @_;
+    # Perl::Critic extends Perl Best Practices here. The latter merely
+    # forbids single-arg selects for the purpose of setting autoflush.
     if ($opt{binary}) {
-	select $binout;
+	select $binout;	## no critic (ProhibitOneArgSelect)
     } else {
-	select STDOUT;
+	select STDOUT;	## no critic (ProhibitOneArgSelect)
     }
     my @rslt;
-    foreach (@_) {
+    foreach (@tokens) {
 	if (m/^<<(.*)/) {
 	    my $eod = $1;
 	    my $token = '';
@@ -470,21 +496,24 @@ eod
 	    push @rslt, $token;
 	} elsif (m/^<(.*)/) {
 	    my $fn = $1;
-	    open (my $fh, '<', $fn)
+	    my $fh = IO::File->new($fn, '<')
 		or die "Failed to open $fn: $!\n";
 	    local $/ = undef;
 	    push @rslt, scalar <$fh>;
 	} elsif (m/^(>{1,2})(.*)/) {
 	    my ($flg, $fn) = ($1, $2);
-	    open (my $fh, $flg, $fn)
+	    my $fh = IO::File->new($fn, $flg)
 		or die "Failed to open $fn: $!\n";
 	    $opt{binary} and binmode ($fh);
-	    select $fh;
+	    # Perl::Critic extends Perl Best Practices here. The latter
+	    # merely forbids single-arg selects for the purpose of
+	    # setting autoflush.
+	    select $fh;	## no critic (ProhibitOneArgSelect)
 	} else {
 	    push @rslt, $_;
 	}
     }
-    @rslt;
+    return @rslt;
 }
 
 #	@args = _options (@args);
@@ -499,7 +528,7 @@ sub _options {
 	or die _usage (1);
     $pb and $pb->set (id => $opt{id});
     @ARGV and create (shift @ARGV);
-    @ARGV;
+    return @ARGV;
 }
 
 #	_usage ($verbosity, $exitval)
@@ -555,17 +584,18 @@ L<http://rt.cpan.org/>.
 
 Thomas R. Wyant, III (F<wyant at cpan dot org>)
 
-=head1 COPYRIGHT
+=head1 COPYRIGHT AND LICENSE
 
-Copyright 2008 by Thomas R. Wyant, III
-(F<wyant at cpan dot org>). All rights reserved.
+Copyright (C) 2008, 2011 by Thomas R. Wyant, III
 
-=head1 LICENSE
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl 5.10.0. For more details, see the full text
+of the licenses in the directory LICENSES.
 
-This script is free software; you can use it, redistribute it
-and/or modify it under the same terms as Perl itself. Please see
-L<http://perldoc.perl.org/index-licence.html> for the current licenses.
+This program is distributed in the hope that it will be useful, but
+without any warranty; without even the implied warranty of
+merchantability or fitness for a particular purpose.
 
-This software is provided without any warranty of any kind, express or
-implied. The author will not be liable for any damages of any sort
-relating in any way to this software.
+=cut
+
+# ex: set textwidth=72 :
