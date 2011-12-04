@@ -40,7 +40,7 @@
    "provides" : {
       "Mac::Pasteboard" : {
          "file" : "lib/Mac/Pasteboard.pm",
-         "version" : "0.002_90"
+         "version" : "0.002_91"
       }
    },
    "release_status" : "testing",
@@ -52,5 +52,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.002_90"
+   "version" : "0.002_91"
 }

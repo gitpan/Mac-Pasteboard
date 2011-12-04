@@ -20,7 +20,7 @@ no_index:
 provides:
   Mac::Pasteboard:
     file: lib/Mac/Pasteboard.pm
-    version: 0.002_90
+    version: 0.002_91
 requires:
   Carp: 0
   Scalar::Util: 1.01
@@ -30,4 +30,4 @@ requires:
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=Mac-Pasteboard
   license: http://dev.perl.org/licenses/
-version: 0.002_90
+version: 0.002_91
