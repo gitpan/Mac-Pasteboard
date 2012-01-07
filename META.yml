@@ -6,7 +6,7 @@ build_requires:
   ExtUtils::CBuilder: 0
   Test::More: 0.88
 dynamic_config: 1
-generated_by: 'Module::Build version 0.3901, CPAN::Meta::Converter version 2.112621'
+generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.113640'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -20,7 +20,7 @@ no_index:
 provides:
   Mac::Pasteboard:
     file: lib/Mac/Pasteboard.pm
-    version: 0.003
+    version: 0.004
 requires:
   Carp: 0
   Scalar::Util: 1.01
@@ -30,4 +30,4 @@ requires:
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=Mac-Pasteboard
   license: http://dev.perl.org/licenses/
-version: 0.003
+version: 0.004

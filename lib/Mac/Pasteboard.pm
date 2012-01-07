@@ -43,7 +43,7 @@ our @ISA = qw(Exporter);
     our @EXPORT = @funcs;	## no critic (ProhibitAutomaticExportation)
 }
 
-our $VERSION = '0.003';
+our $VERSION = '0.004';
 our $XS_VERSION = $VERSION;
 our $ALPHA_VERSION = $VERSION;
 $VERSION =~ s/_//g;
@@ -60,8 +60,11 @@ BEGIN {
 	*dualvar = sub {$_[0]};
     };
 
+    # Mac::Errors is optional. We load it by file name to try to avoid
+    # prereq_matches_use problems in the Kwalitee Game.
     eval {	## no critic (RequireCheckingReturnValueOfEval)
-	require Mac::Errors;	# Optional
+##	require Mac::Errors;	# Optional
+	require 'Mac/Errors.pm';	## no critic (RequireBarewordIncludes)
 	1;
     };
 }
@@ -970,7 +973,7 @@ Thomas R. Wyant, III, F<wyant at cpan dot org>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008, 2011 by Thomas R. Wyant, III
+Copyright (C) 2008, 2011-2012 by Thomas R. Wyant, III
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl 5.10.0. For more details, see the full text
