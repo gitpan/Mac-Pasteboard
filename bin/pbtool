@@ -92,13 +92,12 @@ use Mac::Pasteboard qw{:const};
 use Text::ParseWords;
 
 BEGIN {
-    eval {require YAML::Syck; YAML::Syck->import ('Dump'); 1} or
     eval {require YAML; YAML->import ('Dump'); 1} or
     eval {require Data::Dumper; *Dump = \&Data::Dumper::Dumper; 1} or
-    die "Neither YAML::Syck, YAML, nor Data::Dumper available.\n";
+    die "Neither YAML nor Data::Dumper available.\n";
 }
 
-our $VERSION = '0.004';
+our $VERSION = '0.004_01';
 our $ALPHA_VERSION = $VERSION;
 $VERSION =~ s/_//g;
 
@@ -133,7 +132,7 @@ eod
 	*_read_contin = sub {print STDERR $_[0] || '-> '; <STDIN>};
     }
     warn <<'EOD';
-Copyright (C) 2008, 2011-2012 Thomas R. Wyant, III.
+Copyright (C) 2008, 2011-2013 Thomas R. Wyant, III.
 See documentation for license.
 
 EOD
@@ -150,7 +149,8 @@ while (defined ($_ = _readline ())) {
     substr ($_, 0, 1) eq '#' and next;
     eval {
 	my ($cmd, @args) = _parse_tokens (quotewords ('\s+', 0, $_));
-	substr ($cmd, 0, 1) ne '_' and my $code = __PACKAGE__->can ($cmd)
+	$cmd !~ m/ \A _ /smx
+	    and my $code = __PACKAGE__->can( $cmd )
 	    or die "No such command as '$cmd'.\n";
 	$code->(@args);
 	1;
@@ -238,15 +238,52 @@ sub exit {	## no critic (ProhibitBuiltinHomonyms)
     CORE::exit;
 }
 
+=head2 encode
+
+This command displays whether data are encoded onto and decoded from the
+pasteboard. If an argument is passed, it becomes the new setting. The
+arguments are by convention C<1> to encode, and C<0> not to encode,
+though the value of this setting is interpreted in its Perl Boolean
+sense.
+
+Note that this only affects certain flavors of data.
+
+=cut
+
+sub encode {
+    my ( $encode ) = @_;
+    $pb or create();
+    print $pb->get( 'encode' ), "\n";
+    defined $encode
+	and $pb->set( encode => $encode );
+    return;
+}
+
+=head2 flavor
+
+This command displays the name of the current default flavor. If an
+argument is passed, this becomes the new default flavor.
+
+=cut
+
+sub flavor {
+    my ( $flavor ) = @_;
+    $pb or create();
+    print $pb->get( 'default_flavor' ), "\n";
+    defined $flavor
+	and $pb->set( default_flavor => $flavor );
+    return;
+}
+
 =head2 flavors [conforms_to]
 
 This command dumps the flavors of data present on the clipboard which
 conform to the given flavor, If no conforming flavor is given, all
 flavors are dumped. If the I<id> is defined, only data from that
-pasteboard item are dumped. The output is in YAML if either module
-B<YAML::Syck> or B<YAML> can be loaded, or in B<Data::Dumper> format if
-that module can be loaded.  Either way, what you actually get is an
-array of anonymous hashes. Each hash has the following keys:
+pasteboard item are dumped. The output is in YAML if module B<YAML>
+can be loaded, or in B<Data::Dumper> format if that module can be
+loaded.  Either way, what you actually get is an array of anonymous
+hashes. Each hash has the following keys:
 
  flag_names: a reference to a list of the names of the flags set;
  flags: the flavor flags;
@@ -275,15 +312,15 @@ see them.
 
 =cut
 
+
 my %flavor_tags;
 
 sub flavors {
-    $pb or create ();
-    print Dump ([map {
-	    $_->{flag_names} = [$pb->flavor_flag_names ($_->{flags})];
-	    $_->{tags} = $flavor_tags{$_->{flavor}}
-		||= $pb->flavor_tags ($_->{flavor});
-	    $_} $pb->flavors (@_)]);
+    my @args = @_;
+    $pb or create();
+    my @flavors = $pb->flavors( @args );
+    _expand_flavors( $pb, @flavors );
+    print Dump( \@flavors );
     return;
 }
 
@@ -343,6 +380,37 @@ still in effect):
     }
 }
 
+=head2 output (encoding)
+
+This command displays the encoding used for non-binary output to
+standard out. If no encoding has been specified, the display will be
+C<'none'>.
+
+If an argument is specified, it becomes the new encoding. Specifying
+C<'none'> as the new encoding removes the the encoding, if any.
+
+=cut
+
+sub output {
+    my ( $new_encoding ) = @_;
+    my @layers = PerlIO::get_layers( STDOUT, output => 1 );
+    my $old_encoding;
+    foreach ( @layers ) {
+	m/ \A encoding [(] ( .* ) [)] \z /smx
+	    or next;
+	$old_encoding = $1;
+	last;
+    }
+    print defined $old_encoding ? "$old_encoding\n" : "none\n";
+    if ( defined $new_encoding && $new_encoding ne '' ) {
+	defined $old_encoding
+	    and binmode STDOUT, ':pop';
+	$new_encoding ne 'none'
+	    and binmode STDOUT, ":encoding($new_encoding)";
+    }
+    return;
+}
+
 =head2 paste [flavor]
 
 This command retrieves the given flavor from the current pasteboard and
@@ -383,12 +451,11 @@ for the concept of conformance.
 =cut
 
 sub paste_all {
+    my @args = @_;
     $pb or create ();
-    print Dump ([map {
-	    $_->{flag_names} = [$pb->flavor_flag_names ($_->{flags})];
-	    $_->{tags} = $flavor_tags{$_->{flavor}}
-		||= $pb->flavor_tags ($_->{flavor});
-	    $_} $pb->paste_all (@_)]);
+    my @flavors = $pb->paste_all( @args );
+    _expand_flavors( $pb, @flavors );
+    print Dump( \@flavors );
     return;
 }
 
@@ -463,6 +530,26 @@ sub unique {
 ########################################################################
 #
 #	Utility subroutines
+#
+#	_expand_flavors( $pb, @flavors );
+#
+#	This subroutine takes as its arguments a pasteboard object and
+#	some flavor data returned by flavors(). The data are expanded
+#	for display. Nothing is returned.
+#
+
+sub _expand_flavors {
+    my ( $pb, @flavors ) = @_;
+    foreach my $flav ( @flavors ) {
+	$flav->{flag_names} = [
+	    $pb->flavor_flag_names( $flav->{flags} ) ];
+	$flav->{tags} = $flavor_tags{$flav->{flavor}} ||=
+	    $pb->flavor_tags( $flav->{flavor} );
+	$flav->{flags} = sprintf '0x%x', $flav->{flags};
+    }
+    return;
+}
+
 #
 #	(@tokens) = _parse_tokens (quotewords ('\s+', 0, $_));
 #
@@ -586,7 +673,7 @@ Thomas R. Wyant, III (F<wyant at cpan dot org>)
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008, 2011-2012 by Thomas R. Wyant, III
+Copyright (C) 2008, 2011-2013 by Thomas R. Wyant, III
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl 5.10.0. For more details, see the full text

@@ -4,7 +4,7 @@
       "Tom Wyant (wyant at cpan dot org)"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.38, CPAN::Meta::Converter version 2.113640",
+   "generated_by" : "Module::Build version 0.4005, CPAN::Meta::Converter version 2.130880",
    "license" : [
       "perl_5"
    ],
@@ -23,27 +23,28 @@
    "prereqs" : {
       "build" : {
          "requires" : {
-            "ExtUtils::CBuilder" : 0,
+            "ExtUtils::CBuilder" : "0",
             "Test::More" : "0.88"
          }
       },
       "runtime" : {
          "requires" : {
-            "Carp" : 0,
+            "Carp" : "0",
+            "Encode" : "0",
             "Scalar::Util" : "1.01",
             "perl" : "5.006",
-            "strict" : 0,
-            "warnings" : 0
+            "strict" : "0",
+            "warnings" : "0"
          }
       }
    },
    "provides" : {
       "Mac::Pasteboard" : {
          "file" : "lib/Mac/Pasteboard.pm",
-         "version" : "0.004"
+         "version" : "0.004_01"
       }
    },
-   "release_status" : "stable",
+   "release_status" : "testing",
    "resources" : {
       "bugtracker" : {
          "web" : "https://rt.cpan.org/Public/Dist/Display.html?Name=Mac-Pasteboard"
@@ -52,5 +53,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.004"
+   "version" : "0.004_01"
 }
