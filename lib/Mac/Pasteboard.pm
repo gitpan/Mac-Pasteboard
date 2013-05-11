@@ -31,6 +31,7 @@ use base qw{ Exporter };
 	};
     my @funcs = qw{
 	pbcopy pbcopy_find
+	pbencode pbencode_find
 	pbflavor pbflavor_find
 	pbpaste pbpaste_find
     };
@@ -48,7 +49,7 @@ use base qw{ Exporter };
     our @EXPORT = @funcs;	## no critic (ProhibitAutomaticExportation)
 }
 
-our $VERSION = '0.004_01';
+our $VERSION = '0.005';
 our $XS_VERSION = $VERSION;
 our $ALPHA_VERSION = $VERSION;
 $VERSION =~ s/_//g;
