@@ -49,7 +49,7 @@ use base qw{ Exporter };
     our @EXPORT = @funcs;	## no critic (ProhibitAutomaticExportation)
 }
 
-our $VERSION = '0.006';
+our $VERSION = '0.006_01';
 our $XS_VERSION = $VERSION;
 our $ALPHA_VERSION = $VERSION;
 $VERSION =~ s/_//g;
@@ -1130,7 +1130,7 @@ Thomas R. Wyant, III, F<wyant at cpan dot org>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008, 2011-2013 by Thomas R. Wyant, III
+Copyright (C) 2008, 2011-2014 by Thomas R. Wyant, III
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl 5.10.0. For more details, see the full text
