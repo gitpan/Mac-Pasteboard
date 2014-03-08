@@ -41,10 +41,10 @@
    "provides" : {
       "Mac::Pasteboard" : {
          "file" : "lib/Mac/Pasteboard.pm",
-         "version" : "0.006_02"
+         "version" : "0.007"
       }
    },
-   "release_status" : "testing",
+   "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
          "web" : "https://rt.cpan.org/Public/Dist/Display.html?Name=Mac-Pasteboard"
@@ -53,5 +53,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "0.006_02"
+   "version" : "0.007"
 }
